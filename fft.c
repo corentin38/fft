@@ -2,9 +2,11 @@
  * @autor <corentin@marciau.fr>
  */
 
+#define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <sys/types.h>
 
 #include "main.h"
 #include "fft.h"
@@ -74,7 +76,7 @@ void fft_compute_brute (fft_engine_t self) {
 }
 
 void fft_compute_fft (fft_engine_t self) {
-
+	printf ("Unable to fft with %d\n", self->sample_amount);
 }
 
 void fft_compute (fft_engine_t self, enum algorithm_e algo) {
