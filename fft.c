@@ -16,16 +16,23 @@ struct fft_engine {
 	int sample_amount;
 	short *signal_buffer;
 	double *freq_buffer;
+	algorithm algo;
+};
+
+struct fft_slicer {
+	short *head;
+	short step;
 };
 
 double pi;
 
-fft_engine_t fft_engine_create (FILE* signal_input, int sample_amount) {
+fft_engine_t fft_engine_create (FILE* signal_input, int sample_amount, algorithm algo) {
 	fft_engine_t ret = (fft_engine_t) malloc (sizeof(fft_engine_s));
 	ret->signal_input = signal_input;
 	ret->sample_amount = sample_amount;
 	ret->signal_buffer = (short *) malloc (sample_amount * sizeof(short));
 	ret->freq_buffer = (double *) malloc (sample_amount * sizeof(double));
+	ret->algo = algo;
 	return ret;
 }
 
@@ -75,14 +82,29 @@ void fft_compute_brute (fft_engine_t self) {
 	aff (self->freq_buffer, self->sample_amount);
 }
 
-void fft_compute_fft (fft_engine_t self) {
-	printf ("Unable to fft with %d\n", self->sample_amount);
+short signal_at (slicer sl, int i) {
+	return *(sl.head + (1 << sl.step) * i);
 }
 
-void fft_compute (fft_engine_t self, enum algorithm_e algo) {
+void fft_compute_fft (fft_engine_t self) {
+	//printf ("Unable to fft with %d\n", self->sample_amount);
+	double bla;
+	double step = 2 * pi / 1024;
+	for (int j=0; j<100000; j++) {
+	for (int i=0; i<1024; i++) {
+		bla = cos(i * step);
+	}
+	}
+
+	slicer sl = {self->signal_buffer, 0};
+
+
+}
+
+void fft_compute (fft_engine_t self) {
 	pi = acos(-1.0);
 
-	switch (algo) {
+	switch (self->algo) {
 	case BRUTE:
 		fft_compute_brute (self);
 		break;
@@ -91,7 +113,7 @@ void fft_compute (fft_engine_t self, enum algorithm_e algo) {
 		break;
 	default:
 		fprintf(stderr, "%s: Unknown algorithm id : %d\n",
-				__progname, algo);
+				__progname, self->algo);
 		break;
 	}
 }
