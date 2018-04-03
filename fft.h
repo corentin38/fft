@@ -14,7 +14,8 @@ typedef enum algorithm_e {
 	FFT
 } algorithm;
 
-typedef struct fft_slicer slicer;
+typedef struct fft_sig_slicer s_slicer;
+typedef struct fft_freq_slicer f_slicer;
 
 fft_engine_t fft_engine_create (FILE* signal_input, int sample_amount, algorithm algo);
 

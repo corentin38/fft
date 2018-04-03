@@ -10,18 +10,27 @@
 
 #include "main.h"
 #include "fft.h"
+#include "cos.h"
 
 struct fft_engine {
 	FILE *signal_input;
 	int sample_amount;
+	int sample_amount_pow2;
 	short *signal_buffer;
 	double *freq_buffer;
 	algorithm algo;
 };
 
-struct fft_slicer {
+struct fft_sig_slicer {
 	short *head;
-	short step;
+	short offset;
+	short step; // step 0 = slice of original size. Step++ => size /= 2
+};
+
+struct fft_freq_slicer {
+	double *head;
+	short offset;
+	short step; // step 0 = slice of original size. Step++ => size /= 2
 };
 
 double pi;
@@ -30,6 +39,7 @@ fft_engine_t fft_engine_create (FILE* signal_input, int sample_amount, algorithm
 	fft_engine_t ret = (fft_engine_t) malloc (sizeof(fft_engine_s));
 	ret->signal_input = signal_input;
 	ret->sample_amount = sample_amount;
+	ret->sample_amount_pow2 = log2 (sample_amount);
 	ret->signal_buffer = (short *) malloc (sample_amount * sizeof(short));
 	ret->freq_buffer = (double *) malloc (sample_amount * sizeof(double));
 	ret->algo = algo;
@@ -82,23 +92,103 @@ void fft_compute_brute (fft_engine_t self) {
 	aff (self->freq_buffer, self->sample_amount);
 }
 
-short signal_at (slicer sl, int i) {
-	return *(sl.head + (1 << sl.step) * i);
+short signal_at (s_slicer sl, int i) {
+	return *((sl.head + sl.offset) + (1 << sl.step) * i);
+}
+
+void set_signal_at (s_slicer sl, int i, short val) {
+	*((sl.head + sl.offset) + (1 << sl.step) * i) = val;
+}
+
+short freq_at (f_slicer sl, int i) {
+	return *((sl.head + sl.offset) + (1 << sl.step) * i);
+}
+
+void set_freq_at (f_slicer sl, int i, short val) {
+	*((sl.head + sl.offset) + (1 << sl.step) * i) = val;
+}
+
+void fft_compute_4 (fft_engine_t self, s_slicer ssl, f_slicer fsl) {
+	short x0 = signal_at (ssl, 0);
+	short x1 = signal_at (ssl, 1);
+	short x2 = signal_at (ssl, 2);
+	short x3 = signal_at (ssl, 3);
+
+	double X0 = x0 + x1 + x2 + x3;
+	double X1 = x0 - x2;
+	double X2 = x0 - x1 + x2 - x3;
+	double X3 = x0 - x2;
+
+	set_freq_at(fsl, 0, X0);
+	set_freq_at(fsl, 1, X1);
+	set_freq_at(fsl, 2, X2);
+	set_freq_at(fsl, 3, X3);
+}
+
+double hack_cos (int numerateur, int denominateur) {
+	return cos_step[ ( 1024 / denominateur ) * numerateur ];
+}
+
+void fft_add_sub_fft (fft_engine_t self, f_slicer even_sl, f_slicer odd_sl) {
+	static double tmp[1024];
+
+	if (even_sl.step != odd_sl.step) {
+		fprintf(stderr,
+		        "Trying to add two sub fft of different sizes : %d, %d\n",
+		        even_sl.step,
+		        odd_sl.step);
+		return;
+	}
+
+	int size  = 1 << (10 - even_sl.step); // Number of samples of the slice
+	int double_size = size * 2;
+
+	for (int i=0; i<size; i++) {
+		double even = freq_at(even_sl, i);
+		double odd =  freq_at(odd_sl,  i);
+
+		tmp[i]      = even + hack_cos (i,        double_size) * odd;
+		tmp[i+size] = even + hack_cos (i + size, double_size) * odd;
+	}
+
+	for (int i=0; i<size; i++) {
+		set_freq_at(even_sl, i, tmp[2*i]);
+		set_freq_at(odd_sl,  i, tmp[2*i+1]);
+	}
 }
 
 void fft_compute_fft (fft_engine_t self) {
-	//printf ("Unable to fft with %d\n", self->sample_amount);
-	double bla;
-	double step = 2 * pi / 1024;
-	for (int j=0; j<100000; j++) {
-	for (int i=0; i<1024; i++) {
-		bla = cos(i * step);
+	int depth = self->sample_amount_pow2;
+	int size = self->sample_amount;
+	int bottom = depth - 2; // Number of halvings to get to 4 elem groups
+
+	// Computing all 4 element groups in the freq buffer
+	int group4_amount = size / 4;
+	for (int i=0; i<group4_amount; i++) {
+		s_slicer sig_sl = {
+			self->signal_buffer + i,
+			i,
+			bottom
+		};
+		f_slicer freq_sl = {
+			self->freq_buffer + i,
+			i,
+			bottom
+		};
+
+		fft_compute_4 (self, sig_sl, freq_sl);
 	}
+
+	int step = bottom;
+	while (step > 0) {
+		int nb_paire_subfft = 1 << (step - 1);
+		for (int i=0; i<nb_paire_subfft; i++) {
+			f_slicer even = { self->freq_buffer + 2*i,     2*i, step };
+			f_slicer odd  = { self->freq_buffer + 2*i + 1, 2*i, step };
+			fft_add_sub_fft (self, even, odd);
+		}
+		step--;
 	}
-
-	slicer sl = {self->signal_buffer, 0};
-
-
 }
 
 void fft_compute (fft_engine_t self) {
