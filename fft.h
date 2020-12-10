@@ -16,9 +16,9 @@ enum algorithm_e {
 fft_engine_t fft_engine_create (FILE* signal_input, int sample_amount);
 
 // For now, read sample_amount samples and quit
-void fft_read_signal (fft_engine_t self);
+int fft_read_signal (fft_engine_t self);
 
-void fft_compute (fft_engine_t self, enum algorithm_e algo);
+int fft_compute (fft_engine_t self, enum algorithm_e algo);
 
 void fft_engine_destroy (fft_engine_t self);
 

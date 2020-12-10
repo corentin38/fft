@@ -16,3 +16,6 @@ $(TARGET): $(O_FILES)
 
 $(OBJ_DIR)/%.o: %.c $(H_FILES)
 	$(CC) $(FLAGS) $(SPECIAL_HEADER) -c $< -o $@
+
+clean:
+	rm -rf $(TARGET) $(OBJ_DIR)/*
