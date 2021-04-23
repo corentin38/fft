@@ -31,13 +31,14 @@ fft_engine_t fft_engine_create (FILE* signal_input, int sample_amount) {
 void aff (double *tab, int size) {
 	int count = 0;
 	for (int i=0; i<size; i++) {
-		printf ("%lf\n", tab[i]);
+		printf ("%lf\t", tab[i]);
 		count++;
-		if (count > 50) {
-			printf ("\n[...] (Skipping %d samples)\n", size - count);
-			break;
+		if (count >= 8) {
+			printf ("\n");
+			count = 0;
 		}
 	}
+	printf ("\n");
 }
 
 void affs (unsigned short *tab, int size) {
@@ -61,7 +62,7 @@ int fft_read_signal (fft_engine_t self) {
 	for (nbread = 0; nbread < self->sample_amount; nbread++) {
 		errno = 0;
 
-		fscanf_ret = fscanf (self->signal_input, "%hu,", &sample);
+		fscanf_ret = fscanf (self->signal_input, "%hu\n", &sample);
 
 		if (fscanf_ret == 1) {
 			self->signal_buffer[nbread] = sample;
@@ -85,12 +86,13 @@ int fft_compute_brute (fft_engine_t self) {
 
 		// X_k = Somme[n=0..N-1] x_k * s^-i.2.pi.k.n/N
 		//     = Somme[n=0..N-1] x_k * ( cos(2 * pi * k * n / N) + i * sin(2* pi * k * n / N) )
+		// We skip the imaginary part
 
 		for (int n=0; n<self->sample_amount; n++) {
 			double ratio = ( (double) n / self->sample_amount );
 			double factor = cos (2 * pi * k * ratio);
-			factor = self->signal_buffer[n] * factor;
-			self->freq_buffer[k] += factor;
+
+			self->freq_buffer[k] += ( self->signal_buffer[n] * factor );
 		}
 	}
 

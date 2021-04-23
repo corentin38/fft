@@ -9,6 +9,8 @@ H_FILES = $(wildcard *.h)
 O_FILES = $(patsubst %.c,$(OBJ_DIR)/%.o,$(C_FILES))
 TARGET = fft
 
+.PHONY: all clean
+
 all: $(TARGET)
 
 $(TARGET): $(O_FILES)
