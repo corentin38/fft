@@ -16,8 +16,11 @@ all: $(TARGET)
 $(TARGET): $(O_FILES)
 	$(CC) $(FLAGS) $(LIBS) $^ -o $@
 
-$(OBJ_DIR)/%.o: %.c $(H_FILES)
+$(OBJ_DIR)/%.o: %.c $(H_FILES) $(OBJ_DIR)
 	$(CC) $(FLAGS) $(SPECIAL_HEADER) -c $< -o $@
 
+$(OBJ_DIR):
+	mkdir -p $@
+
 clean:
-	rm -rf $(TARGET) $(OBJ_DIR)/*
+	rm -rf $(TARGET) $(OBJ_DIR)
