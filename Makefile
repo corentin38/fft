@@ -24,3 +24,6 @@ $(OBJ_DIR):
 
 clean:
 	rm -rf $(TARGET) $(OBJ_DIR)
+
+test: $(TARGET)
+	bats ./test/test.bats
