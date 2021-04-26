@@ -6,97 +6,63 @@
 #include <stdlib.h>
 #include <math.h>
 #include <errno.h>
+#include <string.h>
 
 #include "main.h"
 #include "fft.h"
+#include "logger.h"
+#include "util.h"
 
 struct fft_engine {
-	FILE *signal_input;
-	int sample_amount;
-	unsigned short *signal_buffer;
+	int segment_size;
+	int16_t *signal_buffer;
 	double *freq_buffer;
 };
 
 double pi;
 
-fft_engine_t fft_engine_create (FILE* signal_input, int sample_amount) {
+fft_engine_t fft_engine_create (int segment_size) {
 	fft_engine_t ret = (fft_engine_t) malloc (sizeof(fft_engine_s));
-	ret->signal_input = signal_input;
-	ret->sample_amount = sample_amount;
-	ret->signal_buffer = (unsigned short *) malloc (sample_amount * sizeof(unsigned short));
-	ret->freq_buffer = (double *) malloc (sample_amount * sizeof(double));
+	ret->segment_size = segment_size;
+	ret->signal_buffer = (int16_t *) malloc (segment_size * sizeof(int16_t));
+	ret->freq_buffer = (double *) malloc (segment_size * sizeof(double));
 	return ret;
 }
 
-void aff (double *tab, int size) {
-	int count = 0;
-	for (int i=0; i<size; i++) {
-		printf ("%lf\t", tab[i]);
-		count++;
-		if (count >= 8) {
-			printf ("\n");
-			count = 0;
-		}
-	}
-	printf ("\n");
-}
-
-void affs (unsigned short *tab, int size) {
-	int count = 0;
-	for (int i=0; i<size; i++) {
-		printf ("%hu\n", tab[i]);
-		count++;
-		if (count > 50) {
-			printf ("\n[...] (Skipping %d samples)\n", size - count);
-			break;
-		}
-	}
-}
-
-// For now, read sample_amount samples and quit
-int fft_read_signal (fft_engine_t self) {
-	ssize_t  nbread = 0;
-	unsigned short sample = 0;
-	int fscanf_ret = 0;
-
-	for (nbread = 0; nbread < self->sample_amount; nbread++) {
-		errno = 0;
-
-		fscanf_ret = fscanf (self->signal_input, "%hu\n", &sample);
-
-		if (fscanf_ret == 1) {
-			self->signal_buffer[nbread] = sample;
-		} else if (errno != 0) {
-			perror ("fscanf");
-			fprintf (stderr, "%s: fscanf parsing error while reading sample at position #%ld\n", __progname, nbread);
-			return 1;
-		} else {
-			fprintf (stderr, "%s: Invalid sample at position #%ld\n", __progname, nbread);
-			return 2;
-		}
+int fft_load_segment (fft_engine_t self, int number_of_samples, const int16_t *buffer) {
+	if (number_of_samples > self->segment_size) {
+		loge ("Too many samples <%d> to fit segment size <%d>\n", number_of_samples, self->segment_size);
+		return 1;
 	}
 
-	affs (self->signal_buffer, self->sample_amount);
+	memcpy (self->signal_buffer, buffer, number_of_samples);
+
+	if (number_of_samples < self->segment_size) {
+		logm ("Too few samples <%d> to fill segment size <%d>, padding with 0.0f\n", number_of_samples, self->segment_size);
+		memset (self->signal_buffer + number_of_samples, 0x0000, self->segment_size - number_of_samples);
+	}
+
 	return 0;
 }
 
 int fft_compute_brute (fft_engine_t self) {
-	for (int k=0; k<self->sample_amount; k++) {
-		self->freq_buffer[k] = 0;
+	double N = (double) self->segment_size;
 
-		// X_k = Somme[n=0..N-1] x_k * s^-i.2.pi.k.n/N
-		//     = Somme[n=0..N-1] x_k * ( cos(2 * pi * k * n / N) + i * sin(2* pi * k * n / N) )
+	for (int k=0; k<self->segment_size; k++) {
+		double X_k = 0.0f;
+
+		// X_k = Somme[n=0..N-1] x_n * e^-i.2.pi.k.n/N
+		//     = Somme[n=0..N-1] x_n * ( cos(2 * pi * k * n / N) + i * sin(2* pi * k * n / N) )
 		// We skip the imaginary part
 
-		for (int n=0; n<self->sample_amount; n++) {
-			double ratio = ( (double) n / self->sample_amount );
-			double factor = cos (2 * pi * k * ratio);
-
-			self->freq_buffer[k] += ( self->signal_buffer[n] * factor );
+		for (int n=0; n<self->segment_size; n++) {
+			double x_n = (double) self->signal_buffer[n];
+			X_k += x_n * cos (2.0f * pi * k * ( n / N ));
 		}
+
+		self->freq_buffer[k] = ( 1 / N ) * X_k;
 	}
 
-	aff (self->freq_buffer, self->sample_amount);
 	return 0;
 }
 
@@ -120,7 +86,6 @@ int fft_compute (fft_engine_t self, enum algorithm_e algo) {
 }
 
 void fft_engine_destroy (fft_engine_t self) {
-	fclose (self->signal_input);
 	free (self->signal_buffer);
 	free (self->freq_buffer);
 	free (self);

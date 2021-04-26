@@ -7,4 +7,7 @@
 
 int ispow2 (int x);
 
+void aff (double *tab, int size);
+void affs (short *tab, int size);
+
 #endif /* __UTIL_H__ */
