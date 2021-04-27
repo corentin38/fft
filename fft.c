@@ -35,7 +35,7 @@ int fft_load_segment (fft_engine_t self, int number_of_samples, const int16_t *b
 		return 1;
 	}
 
-	memcpy (self->signal_buffer, buffer, number_of_samples);
+	memcpy (self->signal_buffer, buffer, number_of_samples * sizeof(int16_t));
 
 	if (number_of_samples < self->segment_size) {
 		logm ("Too few samples <%d> to fill segment size <%d>, padding with 0.0f\n", number_of_samples, self->segment_size);
