@@ -98,6 +98,9 @@ int main (int argc, char *argv[]) {
 
 	fft_load_segment (instance, read, buffer);
 	fft_compute (instance, BRUTE);
+
+	fft_write_spectrum (instance, "spectrum.out");
+
 	fft_engine_destroy (instance);
 
 	return EXIT_SUCCESS;

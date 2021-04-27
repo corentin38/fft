@@ -85,6 +85,25 @@ int fft_compute (fft_engine_t self, enum algorithm_e algo) {
 	}
 }
 
+int fft_write_spectrum (fft_engine_t self, char *filename) {
+	FILE *output_file = fopen (filename, "w");
+	char *separator = "\n";
+
+	if (output_file == NULL) {
+		loge ("Unable to write open output file: <%s>\n", filename);
+		return 1;
+	}
+
+	for (int k=0; k<self->segment_size/2; k++) {
+		double freq = 44100.0f * ( k / ( self->segment_size * 1.0f ) );
+		fprintf (output_file, "%f\t%f%s", freq, fabs (self->freq_buffer[k]), separator);
+	}
+
+	fclose (output_file);
+
+	return 0;
+}
+
 void fft_engine_destroy (fft_engine_t self) {
 	free (self->signal_buffer);
 	free (self->freq_buffer);

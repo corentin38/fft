@@ -27,3 +27,7 @@ clean:
 
 test: $(TARGET)
 	bats ./test/test.bats
+
+graph: $(TARGET)
+	./$(TARGET) -n 8192 sample/foo.wav
+	gnuplot --persist sample/spectrum.gnuplot
