@@ -8,6 +8,7 @@ C_FILES = $(wildcard *.c)
 H_FILES = $(wildcard *.h)
 O_FILES = $(patsubst %.c,$(OBJ_DIR)/%.o,$(C_FILES))
 TARGET = fft
+TEST_NSAMPLES := 8192
 
 .PHONY: all clean
 
@@ -29,5 +30,7 @@ test: $(TARGET)
 	bats ./test/test.bats
 
 graph: $(TARGET)
-	./$(TARGET) -n 8192 sample/foo.wav
+	./$(TARGET) -n $(TEST_NSAMPLES) -t BRUTE sample/foo.wav
+	gnuplot --persist sample/spectrum.gnuplot
+	./$(TARGET) -n $(TEST_NSAMPLES) -t FFT sample/foo.wav
 	gnuplot --persist sample/spectrum.gnuplot

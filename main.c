@@ -7,6 +7,7 @@
 #include <unistd.h>
 #include <stdint.h>
 #include <err.h>
+#include <string.h>
 
 #include "main.h"
 #include "util.h"
@@ -27,20 +28,28 @@ int main (int argc, char *argv[]) {
 	char *str_nsamples      = NULL;
 	int   nsamples = NSAMPLES;
 
+	char *str_type = NULL;
+	enum algorithm_e type = BRUTE;
+
 	int custom_input_file_flag = 0;
 	char *str_input      = NULL;
 	FILE *input    = stdin;
 
 	/* Options:
 	 *     -n    Number of samples from input on which to perform transform
+	 *     -v    Print all log messages
+	 *     -t    [BRUTE,FFT] Use bruteforce algo or fft
 	 */
-	while ((ch = getopt(argc, argv, "vn:")) != -1) {
+	while ((ch = getopt(argc, argv, "vn:t:")) != -1) {
 		switch (ch) {
 		case 'n':
 			str_nsamples = optarg;
 			break;
 		case 'v':
 			verbose = 1;
+			break;
+		case 't':
+			str_type = optarg;
 			break;
 		default:
 			usage();
@@ -64,11 +73,21 @@ int main (int argc, char *argv[]) {
 		exit (EXIT_FAILURE);
 	}
 
-	if (nsamples < 4 || nsamples > MAX_NSAMPLES || !ispow2(nsamples)) {
-		fprintf(stderr, "%s: -n argument (number of samples for fourier segment) : should be a power of two between 4 and %d\n",
+	if (nsamples < 2 || nsamples > MAX_NSAMPLES || !ispow2(nsamples)) {
+		fprintf(stderr, "%s: -n argument (number of samples for fourier segment) : should be a power of two between 2 and %d\n",
 		        __progname, MAX_NSAMPLES);
 		nsamples = NSAMPLES;
 		exit (EXIT_FAILURE);
+	}
+
+	if (str_type != NULL) {
+		if (strcmp (str_type, "FFT") == 0) {
+			type = FFT;
+		} else if (strcmp (str_type, "BRUTE") == 0) {
+			type = BRUTE;
+		} else {
+			loge ("Unknown type <%s>", str_type);
+		}
 	}
 
 	if (custom_input_file_flag) {
@@ -97,7 +116,7 @@ int main (int argc, char *argv[]) {
 	read = wave_read_next_samples_first_chan (reader, buffer);
 
 	fft_load_segment (instance, read, buffer);
-	fft_compute (instance, BRUTE);
+	fft_compute (instance, type);
 
 	fft_write_spectrum (instance, "spectrum.out");
 

@@ -66,7 +66,30 @@ int fft_compute_brute (fft_engine_t self) {
 	return 0;
 }
 
-int fft_compute_fft (fft_engine_t self) {
+int
+fft_compute_fft (fft_engine_t self,
+                 int signal_offset,
+                 int freq_offset,
+                 int stride,
+                 int size) {
+	if (size == 1) {
+		self->freq_buffer[freq_offset] = self->signal_buffer[signal_offset];
+		return 0;
+	}
+
+	fft_compute_fft (self, signal_offset,          freq_offset,          2 * stride, size/2);
+	fft_compute_fft (self, signal_offset + stride, freq_offset + size/2, 2 * stride, size/2);
+
+	for (int k=0; k<size/2; k++) {
+		double omega = cos ( 2 * pi * k / ( size * 1.0f ) );
+
+		double Even_k = self->freq_buffer[freq_offset + k];
+		double Odd_k  = self->freq_buffer[freq_offset + size/2 + k];
+
+		self->freq_buffer[freq_offset + k]          = Even_k + omega * Odd_k;
+		self->freq_buffer[freq_offset + size/2 + k] = Even_k - omega * Odd_k;
+	}
+
 	return 0;
 }
 
@@ -77,7 +100,11 @@ int fft_compute (fft_engine_t self, enum algorithm_e algo) {
 	case BRUTE:
 		return fft_compute_brute (self);
 	case FFT:
-		return fft_compute_fft (self);
+		fft_compute_fft (self, 0, 0, 1, self->segment_size);
+		for (int i=0; i<self->segment_size; i++) {
+			self->freq_buffer[i] /= self->segment_size;
+		}
+		return 0;
 	default:
 		fprintf(stderr, "%s: Unknown algorithm id : %d\n",
 				__progname, algo);
