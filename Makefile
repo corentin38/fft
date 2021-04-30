@@ -32,3 +32,6 @@ test: $(TARGET)
 graph: $(TARGET)
 	./$(TARGET) -n $(TEST_NSAMPLES) -t FFT sample/foo.wav
 	gnuplot --persist sample/spectrum.gnuplot
+
+singing_contest: $(TARGET)
+	arecord -d 30 -f CD -D sysdefault | ./$(TARGET) -n $(TEST_NSAMPLES) -s

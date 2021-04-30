@@ -147,6 +147,67 @@ int fft_write_spectrum (fft_engine_t self, char *filename, int raw) {
 	return 0;
 }
 
+void
+fft_print_segment_info (fft_engine_t self)
+{
+	char notes[12][3] = {
+		"A \0",
+		"A#\0",
+		"B \0",
+		"C \0",
+		"C#\0",
+		"D \0",
+		"D#\0",
+		"E \0",
+		"F \0",
+		"F#\0",
+		"G \0",
+		"G#\0"
+	};
+
+	double A_freq = 440.0f;
+
+	/* Drop everything below 100Hz because my audio setup is garbage */
+	double freq_step = 44100.0f / ( self->segment_size * 1.0f );
+	int start_index = 0;
+	double freq_index = 0.0f;
+	while (freq_index < 100) {
+		start_index++;
+		freq_index += freq_step;
+	}
+
+	/* Find max freq */
+	double peak_magnitude = 0.0f;
+	int peak_index = 0;
+	for (int k=start_index; k<self->segment_size/2; k++) {
+		double current_magnitude = self->freq_re_buffer[k];
+		if (current_magnitude > peak_magnitude) {
+			peak_index = k;
+			peak_magnitude = current_magnitude;
+		}
+	}
+
+	double peak_freq = peak_index * freq_step;
+
+	double lower_A = 55.0f;
+	double closest_note = lower_A;
+	int note_steps = 0;
+	double step_factor = pow (2, 1.0f / 12.0f);
+	while (closest_note < peak_freq) {
+		closest_note *= step_factor;
+		note_steps++;
+	}
+	double next_note = closest_note;
+	double previous_note = closest_note /= step_factor;
+	if (peak_freq - previous_note < next_note - peak_freq) {
+		closest_note = previous_note;
+	}
+
+	char *found_note = notes[note_steps % 12];
+
+	printf ("Segment frequency peak: <%f Hz> corresponding to: %s\n", peak_freq, found_note);
+}
+
 void fft_engine_destroy (fft_engine_t self) {
 	free (self->signal_buffer);
 	free (self->freq_re_buffer);

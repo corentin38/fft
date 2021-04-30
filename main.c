@@ -38,6 +38,7 @@ int main (int argc, char *argv[]) {
 	int custom_input_file_flag = 0;
 	char *str_input      = NULL;
 	FILE *input    = stdin;
+	int read_all_input_stream = 0;
 
 	/* Options:
 	 *     -n    Number of samples from input on which to perform transform
@@ -45,8 +46,9 @@ int main (int argc, char *argv[]) {
 	 *     -v    Print all log messages
 	 *     -t    [BRUTE,FFT] Use bruteforce algo or fft
 	 *     -r    raw, write full fft result in output file
+	 *     -s    stream: keep computing ffts on *number of samples* until end of stream. Forcing FFT type
 	 */
-	while ((ch = getopt(argc, argv, "rvp:n:t:")) != -1) {
+	while ((ch = getopt(argc, argv, "srvp:n:t:")) != -1) {
 		switch (ch) {
 		case 'n':
 			str_nsamples = optarg;
@@ -60,6 +62,9 @@ int main (int argc, char *argv[]) {
 			break;
 		case 'r':
 			raw = 1;
+			break;
+		case 's':
+			read_all_input_stream = 1;
 			break;
 		case 't':
 			str_type = optarg;
@@ -126,9 +131,15 @@ int main (int argc, char *argv[]) {
 		input = stdin;
 	}
 
-	printf ("Starting fft engine reading <%d> samples from file <%s>.\n",
-	        nsamples,
-	        custom_input_file_flag ? str_input : "standard input");
+	if (read_all_input_stream) {
+		printf ("Starting fft engine reading <%d>-samples segments from file <%s>.\n",
+		        nsamples,
+		        custom_input_file_flag ? str_input : "standard input");
+	} else {
+		printf ("Starting fft engine reading <%d> samples from file <%s>.\n",
+		        nsamples,
+		        custom_input_file_flag ? str_input : "standard input");
+	}
 
 	wave_reader_t reader = wave_reader_create (input, nsamples);
 	if (wave_read_header (reader) != 0) {
@@ -138,15 +149,27 @@ int main (int argc, char *argv[]) {
 
 	fft_engine_t instance = fft_engine_create (nsamples);
 
-	int16_t *buffer = malloc (nsamples * sizeof (int16_t));
-	int read = 0;
-	read = wave_read_next_samples_first_chan (reader, buffer);
+	if (read_all_input_stream) {
+		int16_t *buffer = malloc (nsamples * sizeof (int16_t));
+		int read = 0;
 
-	fft_load_segment (instance, read, buffer);
+		while ((read = wave_read_next_samples_first_chan (reader, buffer)) != 0) {
+			fft_load_segment (instance, read, buffer);
+			fft_compute (instance, FFT);
+			fft_print_segment_info (instance);
+		}
+	} else {
+		int16_t *buffer = malloc (nsamples * sizeof (int16_t));
+		int read = 0;
+		read = wave_read_next_samples_first_chan (reader, buffer);
 
-	fft_compute (instance, type);
+		fft_load_segment (instance, read, buffer);
 
-	fft_write_spectrum (instance, "spectrum.out", raw);
+		fft_compute (instance, type);
+
+		fft_print_segment_info (instance);
+		fft_write_spectrum (instance, "spectrum.out", raw);
+	}
 
 	fft_engine_destroy (instance);
 
