@@ -38,4 +38,5 @@ void affs (short *tab, int size) {
 			break;
 			}*/
 	}
+	printf ("\n");
 }

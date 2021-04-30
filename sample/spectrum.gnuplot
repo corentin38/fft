@@ -2,7 +2,7 @@
 	xmin=0.
 	xmax=1024.
 	ymin=0.
-	ymax=300.
+	ymax=2400000.
     x10=(xmax-xmin)*10/100
     y10=(ymax-ymin)*10/100
     x5=(xmax-xmin)*5/100

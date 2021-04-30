@@ -19,7 +19,7 @@ fft_engine_t fft_engine_create (int segment_size);
 
 int fft_load_segment (fft_engine_t self, int number_of_samples, const int16_t *buffer);
 int fft_compute (fft_engine_t self, enum algorithm_e algo);
-int fft_write_spectrum (fft_engine_t self, char *filename);
+int fft_write_spectrum (fft_engine_t self, char *filename, int raw);
 void fft_engine_destroy (fft_engine_t self);
 
 #endif /* __FFT_H__ */

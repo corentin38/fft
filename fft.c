@@ -17,6 +17,7 @@ struct fft_engine {
 	int segment_size;
 	int16_t *signal_buffer;
 	double *freq_buffer;
+	double *freq_im_buffer;
 };
 
 double pi;
@@ -26,6 +27,7 @@ fft_engine_t fft_engine_create (int segment_size) {
 	ret->segment_size = segment_size;
 	ret->signal_buffer = (int16_t *) malloc (segment_size * sizeof(int16_t));
 	ret->freq_buffer = (double *) malloc (segment_size * sizeof(double));
+	ret->freq_im_buffer = NULL;
 	return ret;
 }
 
@@ -60,7 +62,7 @@ int fft_compute_brute (fft_engine_t self) {
 			X_k += x_n * cos (2.0f * pi * k * ( n / N ));
 		}
 
-		self->freq_buffer[k] = ( 1 / N ) * X_k;
+		self->freq_buffer[k] = X_k;
 	}
 
 	return 0;
@@ -74,20 +76,29 @@ fft_compute_fft (fft_engine_t self,
                  int size) {
 	if (size == 1) {
 		self->freq_buffer[freq_offset] = self->signal_buffer[signal_offset];
+		self->freq_im_buffer[freq_offset] = 0;
 		return 0;
 	}
 
-	fft_compute_fft (self, signal_offset,          freq_offset,          2 * stride, size/2);
-	fft_compute_fft (self, signal_offset + stride, freq_offset + size/2, 2 * stride, size/2);
+	int half_size = size >> 1; /* Because size has to be a power of 2 */
 
-	for (int k=0; k<size/2; k++) {
-		double omega = cos ( 2 * pi * k / ( size * 1.0f ) );
+	fft_compute_fft (self, signal_offset,          freq_offset,             2 * stride, half_size);
+	fft_compute_fft (self, signal_offset + stride, freq_offset + half_size, 2 * stride, half_size);
 
-		double Even_k = self->freq_buffer[freq_offset + k];
-		double Odd_k  = self->freq_buffer[freq_offset + size/2 + k];
+	for (int k=0; k<half_size; k++) {
+		double omega_re = cos (-2.0f * pi * k * ( 1.0f / size ) );
+		double omega_im = sin (-2.0f * pi * k * ( 1.0f / size ) );
 
-		self->freq_buffer[freq_offset + k]          = Even_k + omega * Odd_k;
-		self->freq_buffer[freq_offset + size/2 + k] = Even_k - omega * Odd_k;
+		double Even_k_re = self->freq_buffer[freq_offset + k];
+		double Even_k_im = self->freq_im_buffer[freq_offset + k];
+
+		double Odd_k_re  = self->freq_buffer[freq_offset + half_size + k];
+		double Odd_k_im  = self->freq_im_buffer[freq_offset + half_size + k];
+
+		self->freq_buffer[freq_offset + k]                = Even_k_re + ( omega_re * Odd_k_re - omega_im * Odd_k_im );
+		self->freq_im_buffer[freq_offset + k]             = Even_k_im + ( omega_re * Odd_k_im + omega_im * Odd_k_re );
+		self->freq_buffer[freq_offset + half_size + k]    = Even_k_re - ( omega_re * Odd_k_re - omega_im * Odd_k_im );
+		self->freq_im_buffer[freq_offset + half_size + k] = Even_k_im - ( omega_re * Odd_k_im + omega_im * Odd_k_re );
 	}
 
 	return 0;
@@ -98,12 +109,11 @@ int fft_compute (fft_engine_t self, enum algorithm_e algo) {
 
 	switch (algo) {
 	case BRUTE:
-		return fft_compute_brute (self);
+		fft_compute_brute (self);
+		return 0;
 	case FFT:
+		self->freq_im_buffer = (double *) malloc (self->segment_size * sizeof(double));
 		fft_compute_fft (self, 0, 0, 1, self->segment_size);
-		for (int i=0; i<self->segment_size; i++) {
-			self->freq_buffer[i] /= self->segment_size;
-		}
 		return 0;
 	default:
 		fprintf(stderr, "%s: Unknown algorithm id : %d\n",
@@ -112,7 +122,7 @@ int fft_compute (fft_engine_t self, enum algorithm_e algo) {
 	}
 }
 
-int fft_write_spectrum (fft_engine_t self, char *filename) {
+int fft_write_spectrum (fft_engine_t self, char *filename, int raw) {
 	FILE *output_file = fopen (filename, "w");
 	char *separator = "\n";
 
@@ -121,9 +131,15 @@ int fft_write_spectrum (fft_engine_t self, char *filename) {
 		return 1;
 	}
 
-	for (int k=0; k<self->segment_size/2; k++) {
-		double freq = 44100.0f * ( k / ( self->segment_size * 1.0f ) );
-		fprintf (output_file, "%f\t%f%s", freq, fabs (self->freq_buffer[k]), separator);
+	if (raw) {
+		for (int k=0; k<self->segment_size; k++) {
+			fprintf (output_file, "%f%s", self->freq_buffer[k], separator);
+		}
+	} else {
+		for (int k=0; k<self->segment_size/2; k++) {
+			double freq = 44100.0f * ( k / ( self->segment_size * 1.0f ) );
+			fprintf (output_file, "%f\t%f%s", freq, fabs (self->freq_buffer[k]), separator);
+		}
 	}
 
 	fclose (output_file);
@@ -134,5 +150,8 @@ int fft_write_spectrum (fft_engine_t self, char *filename) {
 void fft_engine_destroy (fft_engine_t self) {
 	free (self->signal_buffer);
 	free (self->freq_buffer);
+	if (self->freq_im_buffer != NULL) {
+		free (self->freq_im_buffer);
+	}
 	free (self);
 }

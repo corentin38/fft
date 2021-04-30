@@ -30,7 +30,5 @@ test: $(TARGET)
 	bats ./test/test.bats
 
 graph: $(TARGET)
-	./$(TARGET) -n $(TEST_NSAMPLES) -t BRUTE sample/foo.wav
-	gnuplot --persist sample/spectrum.gnuplot
 	./$(TARGET) -n $(TEST_NSAMPLES) -t FFT sample/foo.wav
 	gnuplot --persist sample/spectrum.gnuplot
